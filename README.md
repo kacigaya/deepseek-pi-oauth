@@ -1,0 +1,84 @@
+<p align="center">
+  <img src="Logo.svg" alt="Logo" width="200">
+</p>
+
+<h1 align="center">deepseek-oauth</h1>
+
+<p align="center">
+   <strong>Simple DeepSeek web-login/OAuth bridge installer for Pi.</strong><br>
+   <em>Based on <a href="https://github.com/CJackHwang/ds2api/">CJackHwang/ds2api</a>.</em>
+</p>
+
+## One-liner
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kacigaya/deepseek-oauth/main/install.sh | bash
+```
+
+Non-interactive:
+
+```bash
+DEEPSEEK_EMAIL='you@example.com' DEEPSEEK_PASSWORD='your-password-or-token' \
+  curl -fsSL https://raw.githubusercontent.com/kacigaya/deepseek-oauth/main/install.sh | bash
+```
+
+## What the installer does
+
+- Creates app config at `~/.deepseek-oauth/config.json`.
+- Creates a Pi API-key helper at `~/.pi/agent/deepseek-oauth-key.sh`.
+- Adds a `deepseek-oauth` provider to `~/.pi/agent/models.json`.
+- Adds Pi models:
+  - `deepseek-oauth/deepseek-v4-flash`
+  - `deepseek-oauth/deepseek-v4-pro`
+  - `deepseek-oauth/deepseek-v4-flash-search`
+  - `deepseek-oauth/deepseek-v4-pro-search`
+  - `deepseek-oauth/deepseek-v4-vision`
+
+## Start bridge
+
+After installing/building the bridge binary:
+
+```bash
+~/.deepseek-oauth/start.sh
+```
+
+Expected local OpenAI-compatible endpoint:
+
+```text
+http://127.0.0.1:5001/v1
+```
+
+## Use with Pi
+
+```bash
+pi --model deepseek-oauth/deepseek-v4-pro
+```
+
+Or inside Pi, run `/model` and choose a `deepseek-oauth` model.
+
+## Google-login DeepSeek accounts
+
+If your DeepSeek account was created using Google login, password login may fail unless you set a normal DeepSeek password. If supported by the bridge, you can instead store a browser/web token in the config as the account secret.
+
+## Environment variables
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `DEEPSEEK_EMAIL` | prompt | DeepSeek email or mobile |
+| `DEEPSEEK_PASSWORD` | prompt | DeepSeek password or web token |
+| `DEEPSEEK_OAUTH_CLIENT_KEY` | generated | Local client key used by Pi |
+| `DEEPSEEK_OAUTH_DIR` | `~/.deepseek-oauth` | App config directory |
+| `DEEPSEEK_OAUTH_PORT` | `5001` | Local bridge port |
+| `DEEPSEEK_OAUTH_BASE_URL` | `http://127.0.0.1:5001/v1` | Pi provider base URL |
+| `PI_AGENT_DIR` | `~/.pi/agent` | Pi config directory |
+
+## Files written
+
+```text
+~/.deepseek-oauth/config.json
+~/.deepseek-oauth/start.sh
+~/.pi/agent/deepseek-oauth-key.sh
+~/.pi/agent/models.json
+```
+
+Keep `~/.deepseek-oauth/config.json` private; it contains credentials.
