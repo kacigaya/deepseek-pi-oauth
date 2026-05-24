@@ -92,6 +92,34 @@ PY
   echo "Created $CONFIG_PATH"
 fi
 
+repaired_key="$(random_key)"
+if python3 - "$CONFIG_PATH" "$repaired_key" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+new_key = sys.argv[2]
+cfg = json.loads(path.read_text(encoding="utf-8"))
+keys = cfg.get("client_keys")
+first = keys[0] if isinstance(keys, list) and keys else ""
+bad = not isinstance(first, str) or "DEEPSEEK_OAUTH_CLIENT_KEY" in first or first.startswith("$")
+if not bad:
+    sys.exit(0)
+cfg["client_keys"] = [new_key]
+path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+sys.exit(2)
+PY
+then
+  :
+else
+  status=$?
+  if [[ "$status" -eq 2 ]]; then
+    chmod 600 "$CONFIG_PATH"
+    echo "Repaired invalid client key in $CONFIG_PATH"
+  else
+    echo "Failed to validate $CONFIG_PATH" >&2
+    exit "$status"
+  fi
+fi
+
 cat > "$KEY_SCRIPT" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
@@ -109,8 +137,10 @@ with open(sys.argv[1], 'r', encoding='utf-8') as f:
     cfg = json.load(f)
 keys = cfg.get('client_keys') or []
 if keys:
-    print(keys[0])
-    sys.exit(0)
+    key = keys[0]
+    if isinstance(key, str) and 'DEEPSEEK_OAUTH_CLIENT_KEY' not in key and not key.startswith('$'):
+        print(key)
+        sys.exit(0)
 sys.exit('No client key found in deepseek-oauth config')
 PY
 EOF
