@@ -39,6 +39,30 @@ looks_like_placeholder_key() {
   [[ "$1" == *DEEPSEEK_OAUTH_CLIENT_KEY* || "$1" == '$'* ]]
 }
 
+prompt_read() {
+  local prompt="$1"
+  local secret="${2:-false}"
+  local value
+  if [[ -r /dev/tty ]]; then
+    printf '%s' "$prompt" > /dev/tty
+    if [[ "$secret" == "true" ]]; then
+      IFS= read -rs value < /dev/tty
+      printf '\n' > /dev/tty
+    else
+      IFS= read -r value < /dev/tty
+    fi
+  else
+    printf '%s' "$prompt" >&2
+    if [[ "$secret" == "true" ]]; then
+      IFS= read -rs value
+      printf '\n' >&2
+    else
+      IFS= read -r value
+    fi
+  fi
+  printf '%s' "$value"
+}
+
 need_cmd python3
 need_cmd mkdir
 need_cmd chmod
@@ -62,13 +86,10 @@ else
   fi
 
   if [[ -z "$email" ]]; then
-    printf 'DeepSeek email/mobile: '
-    read -r email
+    email="$(prompt_read 'DeepSeek email/mobile: ')"
   fi
   if [[ -z "$password" ]]; then
-    printf 'DeepSeek password/token: '
-    read -rs password
-    printf '\n'
+    password="$(prompt_read 'DeepSeek password/token: ' true)"
   fi
 
   umask 077
