@@ -95,7 +95,10 @@ fi
 cat > "$KEY_SCRIPT" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-if [[ -n "\${DEEPSEEK_OAUTH_CLIENT_KEY:-}" ]]; then
+looks_like_placeholder_key() {
+  [[ "\$1" == *DEEPSEEK_OAUTH_CLIENT_KEY* || "\$1" == '$'* ]]
+}
+if [[ -n "\${DEEPSEEK_OAUTH_CLIENT_KEY:-}" ]] && ! looks_like_placeholder_key "\$DEEPSEEK_OAUTH_CLIENT_KEY"; then
   printf '%s\\n' "\$DEEPSEEK_OAUTH_CLIENT_KEY"
   exit 0
 fi
