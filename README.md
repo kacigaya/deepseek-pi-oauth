@@ -16,7 +16,7 @@ curl -fsSL https://raw.githubusercontent.com/kacigaya/deepseek-oauth/main/instal
 Non-interactive:
 
 ```bash
-DEEPSEEK_EMAIL='you@example.com' DEEPSEEK_PASSWORD='your-password-or-token' \
+DEEPSEEK_EMAIL='you@example.com' DEEPSEEK_PASSWORD='your-password' \
   curl -fsSL https://raw.githubusercontent.com/kacigaya/deepseek-oauth/main/install.sh | bash
 ```
 
@@ -46,6 +46,13 @@ Expected local OpenAI-compatible endpoint:
 http://127.0.0.1:5001/v1
 ```
 
+If you run DS2API manually with `DS2API_CONFIG_PATH`, install against the same
+config file so Pi and DS2API share the same client key:
+
+```bash
+DEEPSEEK_OAUTH_CONFIG=/path/to/ds2api/config.json ./install.sh
+```
+
 ## Use with Pi
 
 ```bash
@@ -60,16 +67,29 @@ must translate DeepSeek's DSML/XML tool-call output into standard
 
 ## Google-login DeepSeek accounts
 
-If your DeepSeek account was created using Google login, password login may fail unless you set a normal DeepSeek password. If supported by the bridge, you can instead store a browser/web token in the config as the account secret.
+If your DeepSeek account was created using Google login, password login may fail unless you set a normal DeepSeek password.
+
+## DeepSeek account mutes
+
+This bridge uses the DeepSeek web account behind DS2API. If DeepSeek mutes or
+limits that account, Pi may show errors such as:
+
+```text
+Upstream service is unavailable and returned no output.
+```
+
+Check DS2API dev captures or account testing for upstream messages like
+`user is muted`. Use another DeepSeek account or wait until the mute expires.
 
 ## Environment variables
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `DEEPSEEK_EMAIL` | prompt | DeepSeek email or mobile |
-| `DEEPSEEK_PASSWORD` | prompt | DeepSeek password or web token |
+| `DEEPSEEK_PASSWORD` | prompt | DeepSeek password |
 | `DEEPSEEK_OAUTH_CLIENT_KEY` | generated | Local client key used by Pi |
 | `DEEPSEEK_OAUTH_DIR` | `~/.deepseek-oauth` | App config directory |
+| `DEEPSEEK_OAUTH_CONFIG` | `~/.deepseek-oauth/config.json` | DS2API config path |
 | `DEEPSEEK_OAUTH_PORT` | `5001` | Local bridge port |
 | `DEEPSEEK_OAUTH_BASE_URL` | `http://127.0.0.1:5001/v1` | Pi provider base URL |
 | `PI_AGENT_DIR` | `~/.pi/agent` | Pi config directory |

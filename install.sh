@@ -10,7 +10,7 @@ set -euo pipefail
 APP_NAME="deepseek-oauth"
 APP_DIR="${DEEPSEEK_OAUTH_DIR:-$HOME/.deepseek-oauth}"
 PI_AGENT_DIR="${PI_AGENT_DIR:-$HOME/.pi/agent}"
-CONFIG_PATH="$APP_DIR/config.json"
+CONFIG_PATH="${DEEPSEEK_OAUTH_CONFIG:-}"
 KEY_SCRIPT="$PI_AGENT_DIR/deepseek-oauth-key.sh"
 PI_MODELS_JSON="$PI_AGENT_DIR/models.json"
 PORT="${DEEPSEEK_OAUTH_PORT:-5001}"
@@ -63,17 +63,39 @@ prompt_read() {
   printf '%s' "$value"
 }
 
+detect_running_ds2api_config() {
+  command -v lsof >/dev/null 2>&1 || return 1
+  command -v ps >/dev/null 2>&1 || return 1
+  local pid command_line config_path
+  pid="$(lsof -ti "tcp:${PORT}" 2>/dev/null | head -n 1 || true)"
+  [[ -n "$pid" ]] || return 1
+  command_line="$(ps eww -p "$pid" -o command= 2>/dev/null || true)"
+  [[ "$command_line" == *DS2API_CONFIG_PATH=* ]] || return 1
+  config_path="$(printf '%s\n' "$command_line" | sed -n 's/.*DS2API_CONFIG_PATH=\([^ ]*\).*/\1/p' | head -n 1)"
+  [[ -n "$config_path" && -f "$config_path" ]] || return 1
+  printf '%s\n' "$config_path"
+}
+
 need_cmd python3
 need_cmd mkdir
 need_cmd chmod
+
+if [[ -z "$CONFIG_PATH" ]]; then
+  CONFIG_PATH="$(detect_running_ds2api_config || true)"
+  if [[ -n "$CONFIG_PATH" ]]; then
+    echo "Detected running DS2API config: $CONFIG_PATH"
+  else
+    CONFIG_PATH="$APP_DIR/config.json"
+  fi
+fi
 
 if ! command -v pi >/dev/null 2>&1; then
   echo "Warning: pi command not found. Install Pi first:" >&2
   echo "  npm install -g @earendil-works/pi-coding-agent" >&2
 fi
 
-mkdir -p "$APP_DIR" "$PI_AGENT_DIR"
-chmod 700 "$APP_DIR" "$PI_AGENT_DIR" 2>/dev/null || true
+mkdir -p "$APP_DIR" "$PI_AGENT_DIR" "$(dirname "$CONFIG_PATH")"
+chmod 700 "$APP_DIR" "$PI_AGENT_DIR" "$(dirname "$CONFIG_PATH")" 2>/dev/null || true
 
 if [[ -f "$CONFIG_PATH" ]]; then
   echo "Keeping existing $CONFIG_PATH"
@@ -89,23 +111,31 @@ else
     email="$(prompt_read 'DeepSeek email/mobile: ')"
   fi
   if [[ -z "$password" ]]; then
-    password="$(prompt_read 'DeepSeek password/token: ' true)"
+    password="$(prompt_read 'DeepSeek password: ' true)"
   fi
 
   umask 077
   python3 - "$CONFIG_PATH" "$email" "$password" "$client_key" "$PORT" <<'PY'
 import json, pathlib, sys
-path, email, secret, client_key, port = sys.argv[1:6]
-account = {"secret": secret}
+path, email, password, client_key, port = sys.argv[1:6]
+account = {"password": password}
 if email.startswith('+') or email.replace(' ', '').replace('-', '').isdigit():
     account["mobile"] = email
 else:
     account["email"] = email
 cfg = {
   "listen": f"127.0.0.1:{port}",
-  "client_keys": [client_key],
+  "keys": [client_key],
+  "api_keys": [{
+    "key": client_key,
+    "name": "Pi",
+    "remark": "deepseek-oauth local client"
+  }],
   "accounts": [account],
-  "default_model": "deepseek-v4-pro"
+  "default_model": "deepseek-v4-pro",
+  "current_input_file": {
+    "enabled": False
+  }
 }
 pathlib.Path(path).write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 PY
@@ -119,12 +149,45 @@ import json, pathlib, sys
 path = pathlib.Path(sys.argv[1])
 new_key = sys.argv[2]
 cfg = json.loads(path.read_text(encoding="utf-8"))
-keys = cfg.get("client_keys")
-first = keys[0] if isinstance(keys, list) and keys else ""
-bad = not isinstance(first, str) or "DEEPSEEK_OAUTH_CLIENT_KEY" in first or first.startswith("$")
-if not bad:
+def bad_key(value):
+    return not isinstance(value, str) or not value.strip() or "DEEPSEEK_OAUTH_CLIENT_KEY" in value or value.startswith("$")
+def first_string(values):
+    if isinstance(values, list):
+        for value in values:
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return ""
+key = first_string(cfg.get("keys"))
+if bad_key(key):
+    key = first_string(cfg.get("client_keys"))
+if bad_key(key):
+    key = new_key
+changed = False
+if cfg.get("keys") != [key]:
+    cfg["keys"] = [key]
+    changed = True
+api_keys = cfg.get("api_keys")
+valid_api_keys = isinstance(api_keys, list) and any(isinstance(item, dict) and item.get("key") == key for item in api_keys)
+if not valid_api_keys:
+    cfg["api_keys"] = [{"key": key, "name": "Pi", "remark": "deepseek-oauth local client"}]
+    changed = True
+for account in cfg.get("accounts") or []:
+    if not isinstance(account, dict):
+        continue
+    secret = account.pop("secret", None)
+    if secret is not None:
+        changed = True
+        if not account.get("password") and not account.get("token"):
+            account["password"] = secret
+if "client_keys" in cfg:
+    del cfg["client_keys"]
+    changed = True
+current_input_file = cfg.get("current_input_file")
+if isinstance(current_input_file, dict) and current_input_file.get("enabled") is True:
+    current_input_file["enabled"] = False
+    changed = True
+if not changed:
     sys.exit(0)
-cfg["client_keys"] = [new_key]
 path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 sys.exit(2)
 PY
@@ -134,7 +197,7 @@ else
   status=$?
   if [[ "$status" -eq 2 ]]; then
     chmod 600 "$CONFIG_PATH"
-    echo "Repaired invalid client key in $CONFIG_PATH"
+    echo "Updated client key config in $CONFIG_PATH"
   else
     echo "Failed to validate $CONFIG_PATH" >&2
     exit "$status"
@@ -156,8 +219,8 @@ python3 - "\$CONFIG_PATH" <<'PY'
 import json, sys
 with open(sys.argv[1], 'r', encoding='utf-8') as f:
     cfg = json.load(f)
-keys = cfg.get('client_keys') or []
-if keys:
+keys = cfg.get('keys') or cfg.get('client_keys') or []
+if isinstance(keys, list) and keys:
     key = keys[0]
     if isinstance(key, str) and 'DEEPSEEK_OAUTH_CLIENT_KEY' not in key and not key.startswith('$'):
         print(key)
@@ -193,8 +256,12 @@ def m(mid, name, images=False):
     }
 providers['deepseek-oauth'] = {
     "baseUrl": base_url,
-    "api": "openai-responses",
+    "api": "openai-completions",
     "apiKey": f"!{key_script}",
+    "compat": {
+        "supportsDeveloperRole": True,
+        "supportsReasoningEffort": True
+    },
     "models": [
         m("deepseek-v4-flash", "DeepSeek OAuth V4 Flash"),
         m("deepseek-v4-pro", "DeepSeek OAuth V4 Pro"),
