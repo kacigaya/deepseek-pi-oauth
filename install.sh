@@ -35,6 +35,10 @@ PY
   fi
 }
 
+looks_like_placeholder_key() {
+  [[ "$1" == *DEEPSEEK_OAUTH_CLIENT_KEY* || "$1" == '$'* ]]
+}
+
 need_cmd python3
 need_cmd mkdir
 need_cmd chmod
@@ -53,6 +57,9 @@ else
   email="${DEEPSEEK_EMAIL:-}"
   password="${DEEPSEEK_PASSWORD:-}"
   client_key="${DEEPSEEK_OAUTH_CLIENT_KEY:-$(random_key)}"
+  if looks_like_placeholder_key "$client_key"; then
+    client_key="$(random_key)"
+  fi
 
   if [[ -z "$email" ]]; then
     printf 'DeepSeek email/mobile: '
@@ -105,6 +112,10 @@ sys.exit('No client key found in deepseek-oauth config')
 PY
 EOF
 chmod 700 "$KEY_SCRIPT"
+if ! "$KEY_SCRIPT" >/dev/null; then
+  echo "Generated API-key helper failed: $KEY_SCRIPT" >&2
+  exit 1
+fi
 
 python3 - "$PI_MODELS_JSON" "$BASE_URL" "$KEY_SCRIPT" <<'PY'
 import json, pathlib, sys
@@ -128,12 +139,8 @@ def m(mid, name, images=False):
     }
 providers['deepseek-oauth'] = {
     "baseUrl": base_url,
-    "api": "openai-completions",
+    "api": "openai-responses",
     "apiKey": f"!{key_script}",
-    "compat": {
-        "supportsDeveloperRole": True,
-        "supportsReasoningEffort": True
-    },
     "models": [
         m("deepseek-v4-flash", "DeepSeek OAuth V4 Flash"),
         m("deepseek-v4-pro", "DeepSeek OAuth V4 Pro"),

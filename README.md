@@ -2,8 +2,6 @@
   <img src="logo.svg" alt="Logo" width="200">
 </p>
 
-<h1 align="center">deepseek-oauth</h1>
-
 <p align="center">
    <strong>Simple DeepSeek web-login/OAuth bridge installer for Pi.</strong><br>
    <em>Based on <a href="https://github.com/CJackHwang/ds2api/">CJackHwang/ds2api</a>.</em>
@@ -26,7 +24,7 @@ DEEPSEEK_EMAIL='you@example.com' DEEPSEEK_PASSWORD='your-password-or-token' \
 
 - Creates app config at `~/.deepseek-oauth/config.json`.
 - Creates a Pi API-key helper at `~/.pi/agent/deepseek-oauth-key.sh`.
-- Adds a `deepseek-oauth` provider to `~/.pi/agent/models.json`.
+- Adds a `deepseek-oauth` Responses API provider to `~/.pi/agent/models.json`.
 - Adds Pi models:
   - `deepseek-oauth/deepseek-v4-flash`
   - `deepseek-oauth/deepseek-v4-pro`
@@ -55,6 +53,10 @@ pi --model deepseek-oauth/deepseek-v4-pro
 ```
 
 Or inside Pi, run `/model` and choose a `deepseek-oauth` model.
+
+Tool calls use DS2API's Responses-compatible tool-call adaptation. The bridge
+must translate DeepSeek's DSML/XML tool-call output into standard
+`function_call` events for Pi to execute tools.
 
 ## Google-login DeepSeek accounts
 
