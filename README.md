@@ -2,6 +2,8 @@
   <img src="logo.svg" alt="Logo" width="200">
 </p>
 
+<h1 align="center">DeepSeek Pi OAuth</h1>
+
 <p align="center">
    <strong>Simple DeepSeek web-login/OAuth bridge installer for Pi.</strong><br>
    <em>Based on <a href="https://github.com/CJackHwang/ds2api/">CJackHwang/ds2api</a>.</em>
@@ -10,14 +12,14 @@
 ## One-liner
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kacigaya/deepseek-oauth/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/kacigaya/deepseek-pi-oauth/main/install.sh | bash
 ```
 
 Non-interactive:
 
 ```bash
 DEEPSEEK_EMAIL='you@example.com' DEEPSEEK_PASSWORD='your-password' \
-  curl -fsSL https://raw.githubusercontent.com/kacigaya/deepseek-oauth/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/kacigaya/deepseek-pi-oauth/main/install.sh | bash
 ```
 
 ## What the installer does
